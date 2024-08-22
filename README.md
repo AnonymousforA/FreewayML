@@ -7,7 +7,7 @@ This is the code repository for *FreewayML*.
 ​    Streaming (machine) learning (SML) can capture dynamic changes in real-time data and perform continuous updates. It has been widely applied in real-world scenarios such as network security, financial regulation, and energy supply. However, due to the sensitivity and lightweight nature of SML models, existing work suffers from low robustness, sudden decline, and catastrophic forgetting when facing unexpected data distribution drifts. Previous studies have attempted to enhance the stability of SML through methods such as data selection, replay, and constraints. However, these methods are typically designed for specific feature spaces and specific ML algorithms.
 ​    In this paper, we introduce a shift graph based on the distances between data distributions and define three distinct data distribution shift patterns. For these three patterns, we design three adaptive mechanisms, (a) multi-time granularity models, (b) coherent experience clustering, and (c) historical knowledge reuse, that are triggered by a strategy selector, with the goal of enhancing the accuracy and stability of SML. We implement an adaptive and stable SML system, FreewayML, on top of PyTorch, which is suitable for most SML models. Experimental results show that FreewayML significantly outperforms existing SML systems in both stability and accuracy, with a comparable throughput and latency.
 
-![Overview](Images\Overview.png)
+![Overview](./Images/Overview.png)
 
 ## Test Dataset
 
@@ -68,17 +68,17 @@ The \<path to your data file> argument should be the directory path where the da
 
 |                  (a) Mechanisms on Airlines                  |                 (b) Mechanisms on CoverType                  |
 | :----------------------------------------------------------: | :----------------------------------------------------------: |
-| <img src="Images\AirlineMec.png" alt="AirlineMec" style="zoom:25%;" /> | <img src="Images\CovMec.png" alt="CovMec" style="zoom:25%;" /> |
+| <img src="./Images/AirlineMec.png" alt="AirlineMec" style="zoom:25%;" /> | <img src="./Images/CovMec.png" alt="CovMec" style="zoom:25%;" /> |
 |                **(c) Mechanisms on NSL-KDD**                 |              **(d) Mechanisms on Electricity**               |
-| <img src="Images\KDDMec.png" alt="KDDMec" style="zoom:25%;" /> | <img src="Images\EleMec.png" alt="EleMec" style="zoom:25%;" /> |
+| <img src="./Images/KDDMec.png" alt="KDDMec" style="zoom:25%;" /> | <img src="./Images/EleMec.png" alt="EleMec" style="zoom:25%;" /> |
 
 ​    Moreover, we compare FreewayML's performance on these three shift patterns against that of existing frameworks.  Given the varying ratio of the three patterns across the datasets, we focus our evaluation on top of the four real-world datasets, each characterized by distinct shift patterns. 
 
-|      (a) FreewayML on Airlines       |    (b) FreewayML on CoverType    |
-| :----------------------------------: | :------------------------------: |
-| ![AirlineCom](Images\AirlineCom.png) |   ![CovCom](Images\CovCom.png)   |
-|     **(c) FreewayML on NSL-KDD**     | **(d) FreewayML on Electricity** |
-|     ![KDDCom](Images\KDDCom.png)     |   ![EleCom](Images\EleCom.png)   |
+|       (a) FreewayML on Airlines        |    (b) FreewayML on CoverType    |
+| :------------------------------------: | :------------------------------: |
+| ![AirlineCom](./Images/AirlineCom.png) |  ![CovCom](./Images/CovCom.png)  |
+|      **(c) FreewayML on NSL-KDD**      | **(d) FreewayML on Electricity** |
+|     ![KDDCom](./Images/KDDCom.png)     |  ![EleCom](./Images/EleCom.png)  |
 
 ### Performance of FreewayML
 
@@ -110,4 +110,4 @@ For linear models, it is evident that FreewayML substantially outperforms other 
 
 | (a) Performance of StreamingLR | (b) Performance of StreamingMLP |
 | :----------------------------: | :-----------------------------: |
-|   ![PerLR](Images\PerLR.png)   |  ![PerMLP](Images\PerMLP.png)   |
+|  ![PerLR](./Images/PerLR.png)  | ![PerMLP](./Images/PerMLP.png)  |
