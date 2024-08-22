@@ -1,3 +1,4 @@
+import argparse
 import torch
 from torch.utils.data import DataLoader
 import numpy as np
@@ -29,12 +30,15 @@ class ModelHistory:
         return closest_state
 
 def main():
-    filepath = "path_to_your_data.csv"
+    parser = argparse.ArgumentParser(description='Run the machine learning model on specified dataset.')
+    parser.add_argument('filepath', type=str, help='Path to your data file.')
+    args = parser.parse_args()
+
     batch_size = 1024
     num_features = 10
     num_classes = 2
 
-    data_loader = get_data_loader(filepath, batch_size)
+    data_loader = get_data_loader(args.filepath, batch_size)
     incremental_model = IncrementalMLPModel(num_features, num_classes)
     batch_model = Batch_MLPModel(num_features, num_classes)
     dist_calc = DistanceCalculator(num_features)
