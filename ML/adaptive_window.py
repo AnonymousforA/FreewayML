@@ -7,6 +7,7 @@ class AdaptiveWindow:
         self.batches = []
         self.distances = []
         self.threshold = threshold
+        self.saved_features = None  # 用于存储特征的属性
 
     def add_batch(self, new_batch):
         if len(self.batches) >= self.max_batches:
@@ -15,9 +16,7 @@ class AdaptiveWindow:
         self.update_distances(new_batch)
 
     def calculate_distance(self, batch1, batch2):
-        # 取两个批次中较小的行数
         min_rows = min(batch1.shape[0], batch2.shape[0])
-        # 只计算公共行的距离
         return np.linalg.norm(batch1[:min_rows] - batch2[:min_rows])
 
     def update_distances(self, new_batch):
@@ -31,8 +30,13 @@ class AdaptiveWindow:
             sorted_indices = np.argsort([np.mean(dist) if np.any(dist) else 0 for dist in self.distances])
             decay_rates = self.rank_to_decay_rates(sorted_indices)
             for i, rate in enumerate(decay_rates):
-                if i < len(self.batches):  # 确保索引在范围内
-                    self.batches[i] *= rate
+                if i < len(self.batches):
+                    # Calculate the number of samples to keep
+                    keep_count = int(len(self.batches[i]) * rate)
+                    # Randomly select 'keep_count' samples
+                    if keep_count < len(self.batches[i]):
+                        self.batches[i] = self.batches[i][
+                                          np.random.choice(len(self.batches[i]), keep_count, replace=False), :]
 
     def rank_to_decay_rates(self, sorted_indices):
         return [1.0 - (i / len(sorted_indices)) * 0.1 for i in sorted_indices]
@@ -42,4 +46,14 @@ class AdaptiveWindow:
             disorder = np.std([np.mean(dist) if np.any(dist) else 0 for dist in self.distances])
             return disorder > self.threshold
         return False
+
+    def save_current_features(self):
+        """保存当前窗口中的所有批次特征。"""
+        self.saved_features = np.vstack([batch[:, :-1] for batch in self.batches])
+        # 深复制每个批次的特征
+
+    def clear_window(self):
+        """清空当前窗口的批次和距离信息。"""
+        self.batches = []
+        self.distances = []
 

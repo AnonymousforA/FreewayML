@@ -5,13 +5,13 @@ import torch.optim as optim
 import torch.nn as nn
 import numpy as np
 from data_reader import get_data_loader
-from incremental_model import MLPModel as IncrementalMLPModel, train as train_incremental, predict as predict_incremental
-from batch_model import Batch_MLPModel, train_batch_model, predict as predict_batch_model
+from incremental_model import MLPModel as IncrementalMLPModel, train_incremental, predict_incremental
+from batch_model import Batch_MLPModel, train_batch_model, predict_batch_model
 from distance_calculator import DistanceCalculator
 from adaptive_window import AdaptiveWindow
 from scipy.stats import mode
 
-def gaussian_kernel(distance, sigma=1.0):
+def gaussian_kernel(distance, sigma=20.0):
     return np.exp(-distance**2 / (2 * sigma**2))
 
 def kmeans_torch(X, num_clusters, iterations=10):
@@ -126,25 +126,45 @@ def main():
                 print("Slight")
                 # Ensemble predictions from both models
                 pred_inc = predict_incremental(incremental_model, features)
-                pred_batch = predict_batch_model(batch_model, features)
-                weights_inc = gaussian_kernel(shift_distance)
-                weights_batch = gaussian_kernel(shift_distance)
-                ensemble_pred = (weights_inc * pred_inc + weights_batch * pred_batch) / (weights_inc + weights_batch)
-                accuracy = (ensemble_pred == labels).float().mean()
-                accuracies.append(accuracy)
+                if adaptive_window.saved_features is not None:
+                    pred_batch = predict_batch_model(batch_model, features)
+                    weights_inc = gaussian_kernel(shift_distance)
+                    print("Weights from incremental model:", weights_inc)
+
+                    saved_features_tensor = adaptive_window.saved_features
+                    batch_shift_distance = dist_calc.calculate_shift_distance(features.numpy(), saved_features_tensor)
+                    print(shift_distance)
+                    print(batch_shift_distance)
+                    weights_batch = gaussian_kernel(batch_shift_distance)
+                    print("Weights from batch model:", weights_batch)
+
+                    ensemble_pred = (weights_inc * pred_inc + weights_batch * pred_batch) / (weights_inc + weights_batch)
+                    accuracy = (ensemble_pred == labels).float().mean()
+                    print("Accuracy:", accuracy)
+                    accuracies.append(accuracy)
+                else:
+                    accuracy = (pred_inc == labels).float().mean()
+                    accuracies.append(accuracy)
+
+
                 #if accuracies:
                  #   print("Accuracies collected so far:", accuracies)  # 打印目前收集的准确率列表
                 #print("Slight Shift handled.")
 
         # Always train the incremental model
         train_incremental(incremental_model, features, labels, optimizer_incremental, criterion)
+        #print("Incremental train")
         last_batch_data = features
         if labels.size(0) >= 50:
             last_labeled_data = features[-50:]
             last_labels = labels[-50:]
         # Update the batch model conditionally
+        adaptive_window.add_batch(batch_data.numpy())
         if adaptive_window.should_update():
+            #print("batch train")
             train_batch_model(batch_model, adaptive_window, optimizer_batch, criterion)
+            adaptive_window.save_current_features()  # Save the current state before update
+            adaptive_window.clear_window()
             model_history.add_model(batch_model.state_dict(), features.numpy())
 
 

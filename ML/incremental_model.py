@@ -27,7 +27,7 @@ class LogisticRegressionModel(nn.Module):
         x = self.linear(x)
         return self.softmax(x)
 
-def train(model, inputs, labels, optimizer, criterion):
+def train_incremental(model, inputs, labels, optimizer, criterion):
     model.train()
     optimizer.zero_grad()
     outputs = model(inputs)
@@ -36,16 +36,16 @@ def train(model, inputs, labels, optimizer, criterion):
     optimizer.step()
     return loss.item()
 
-def predict(model, inputs):
+def predict_incremental(model, inputs):
     model.eval()
     with torch.no_grad():
         outputs = model(inputs)
         _, predicted = torch.max(outputs, 1)
     return predicted
 
-def save_model(model, filepath):
+def save_incremental(model, filepath):
     torch.save(model.state_dict(), filepath)
 
-def load_model(model, filepath):
+def load_incremental(model, filepath):
     model.load_state_dict(torch.load(filepath))
     model.eval()

@@ -25,6 +25,18 @@ class DistanceCalculator:
         return np.dot(self.P_d.T, centered_x)
 
     def calculate_shift_distance(self, y_t, y_t_minus_1):
+        min_size = min(y_t.shape[0], y_t_minus_1.shape[0])
+        if y_t.shape[0] != y_t_minus_1.shape[0]:
+            if y_t.shape[0] > min_size:
+                indices = np.arange(y_t.shape[0])
+                np.random.shuffle(indices)
+                indices = indices[:min_size]
+                y_t = y_t[indices]
+            else:
+                indices = np.arange(y_t_minus_1.shape[0])
+                np.random.shuffle(indices)
+                indices = indices[:min_size]
+                y_t_minus_1 = y_t_minus_1[indices]
         return np.linalg.norm(y_t - y_t_minus_1)
 
     def update_shifts(self, d_t):

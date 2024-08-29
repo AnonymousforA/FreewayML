@@ -46,16 +46,16 @@ def train_batch_model(model, adaptive_window, optimizer, criterion):
     #print("Model updated with batch data.")
 
 
-def predict(model, inputs):
+def predict_batch_model(model, inputs):
     model.eval()
     with torch.no_grad():
         outputs = model(inputs)
         _, predicted = torch.max(outputs, 1)
     return predicted
 
-def save_model(model, filepath):
+def save_batch(model, filepath):
     torch.save(model.state_dict(), filepath)
 
-def load_model(model, filepath):
+def load_batch(model, filepath):
     model.load_state_dict(torch.load(filepath))
     model.eval()
