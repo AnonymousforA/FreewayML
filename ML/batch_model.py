@@ -29,16 +29,22 @@ class Batch_LogisticRegressionModel(nn.Module):
         x = self.linear(x)
         return self.softmax(x)
 
+
 def train_batch_model(model, adaptive_window, optimizer, criterion):
     for batch_data in adaptive_window.batches:
-        inputs = batch_data[:, :-1]  # Assuming last column is the label
-        labels = batch_data[:, -1].long()
+        inputs = torch.tensor(batch_data[:, :-1], dtype=torch.float32)
+        labels = torch.tensor(batch_data[:, -1], dtype=torch.long)
+
+     #   print("Input shape:", inputs.shape)  # 打印输入形状，确保为 [batch_size, num_features]
+      #  print("Label shape:", labels.shape)  # 打印标签形状，确保为 [batch_size]
+
         optimizer.zero_grad()
         outputs = model(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
-    print("Model updated with batch data.")
+    #print("Model updated with batch data.")
+
 
 def predict(model, inputs):
     model.eval()

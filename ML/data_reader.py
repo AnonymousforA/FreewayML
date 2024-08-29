@@ -16,7 +16,8 @@ class CSVDataSet(Dataset):
         filepath (str): The path to the CSV file.
         """
         self.data = pd.read_csv(filepath)
-        self.data = self.data.values  # Convert DataFrame to NumPy array for easier processing with PyTorch
+     #   print("Original data shape:", self.data.shape)  # 打印原始数据形状
+        self.data = self.data.values
 
     def __len__(self):
         """
@@ -35,7 +36,9 @@ class CSVDataSet(Dataset):
         torch.Tensor: The sample as a PyTorch tensor.
         """
         # Return the data sample at the specified index as a float tensor
-        return torch.tensor(self.data[index], dtype=torch.float32)
+        item = torch.tensor(self.data[index], dtype=torch.float32)
+       # print("Item shape on load:", item.shape)  # 打印加载单项数据时的形状
+        return item
 
 
 def get_data_loader(filepath, batch_size=1024):

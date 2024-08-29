@@ -33,10 +33,15 @@ class DistanceCalculator:
             self.recent_shifts.pop(0)
 
     def calculate_relative_shift_magnitude(self):
-        weights = np.ones(len(self.recent_shifts))  # Equal weighting for simplicity
+        if not self.recent_shifts:
+            return 0, 1  # 如果没有最近的偏移记录，返回默认的均值和标准差
+        weights = np.ones(len(self.recent_shifts))
+        if np.sum(weights) == 0:
+            return 0, 1  # 同样，如果权重和为零，返回默认值
         mu_d = np.average(self.recent_shifts, weights=weights)
         sigma_d = np.std(self.recent_shifts)
         return mu_d, sigma_d
+
 
     def classify_shift(self, d_t, alpha=1.96):
         mu_d, sigma_d = self.calculate_relative_shift_magnitude()

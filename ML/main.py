@@ -1,16 +1,27 @@
 import argparse
 import torch
 from torch.utils.data import DataLoader
+import torch.optim as optim
+import torch.nn as nn
 import numpy as np
-from sklearn.cluster import KMeans
 from data_reader import get_data_loader
 from incremental_model import MLPModel as IncrementalMLPModel, train as train_incremental, predict as predict_incremental
 from batch_model import Batch_MLPModel, train_batch_model, predict as predict_batch_model
 from distance_calculator import DistanceCalculator
 from adaptive_window import AdaptiveWindow
+from scipy.stats import mode
 
 def gaussian_kernel(distance, sigma=1.0):
     return np.exp(-distance**2 / (2 * sigma**2))
+
+def kmeans_torch(X, num_clusters, iterations=10):
+    N, D = X.shape
+    centroids = X[torch.randperm(N)[:num_clusters]]  # randomly initialize centroids
+    for _ in range(iterations):
+        dists = torch.cdist(X, centroids)  # compute distances to centroids
+        labels = torch.argmin(dists, dim=1)  # assign labels
+        centroids = torch.stack([X[labels == k].mean(dim=0) for k in range(num_clusters)])  # recompute centroids
+    return labels, centroids
 
 class ModelHistory:
     def __init__(self):
@@ -45,37 +56,74 @@ def main():
     model_history = ModelHistory()
     adaptive_window = AdaptiveWindow(window_size=5, max_batches=5)
 
-    last_batch_data = None
+    # Optimizers and loss function
+    optimizer_incremental = optim.Adam(incremental_model.parameters(), lr=0.001)
+    optimizer_batch = optim.Adam(batch_model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss()
+
+    last_labeled_data = None
+    last_labels = None
     accuracies = []
+    last_batch_data = None
 
     for batch_data in data_loader:
-        features, labels = batch_data[:, :-1], batch_data[:, -1]
-
-        adaptive_window.add_batch(features.numpy())
-
+        features, labels = batch_data[:, :-1], batch_data[:, -1].long()  # 确保标签是 long 类型
+        #print("Batch processed with features shape:", features.shape)  # 打印特征形状
+        adaptive_window.add_batch(batch_data.numpy())
+        #print("New batch added to adaptive window")
         if last_batch_data is not None:
             shift_distance = dist_calc.calculate_shift_distance(features.numpy(), last_batch_data.numpy())
             shift_type = dist_calc.classify_shift(shift_distance)
-
-            if shift_type == "Severe Shift":
+            print("Shift type:", shift_type)  # 打印位移类型
+            if shift_type == "Severe shift":
                 closest_state = model_history.find_closest_model(features.numpy())
+                #print("Major")
+                print("Closest model state found:", closest_state is not None)  # 检查是否找到最接近的模型状态
                 if closest_state:
                     # Load the closest model for prediction
+                    print("Retrieval")
                     retrieval_model = Batch_MLPModel(num_features, num_classes)
                     retrieval_model.load_state_dict(closest_state)
                     predicted_labels = predict_batch_model(retrieval_model, features)
                     accuracy = (predicted_labels == labels).float().mean()
                     accuracies.append(accuracy)
-                    print("Retrieval Shift handled.")
-                else:
-                    # Handle regular Severe Shift using KMeans
-                    kmeans = KMeans(n_clusters=num_classes).fit(features.numpy())
-                    predicted_labels = kmeans.labels_
-                    accuracy = (predicted_labels == labels.numpy()).mean()
-                    accuracies.append(accuracy)
-                    print("Severe Shift handled without retrieval.")
+                    #if accuracies:
+                    #    print("Accuracies collected so far:", accuracies)  # 打印目前收集的准确率列表
+                    #print("Retrieval Shift handled.")
+                elif last_labeled_data is not None:
+                    print("Clustering")
+                    #print("Features shape:", features.numpy().shape)
+                    #print("Features dtype:", features.numpy().dtype)
+                   # print("Last shape:", last_labeled_data.numpy().shape)
+                    #print("Last dtype:", last_labeled_data.numpy().dtype)
+                    combined_data = torch.vstack((last_labeled_data.clone().detach(), features))
 
-            elif shift_type == "Slight Shift":
+                    clusterlabel, _ = kmeans_torch(combined_data, num_clusters=num_classes)
+                    new_labels_clusters = clusterlabel[-features.size(0):]
+                    label_map = {i: mode(last_labels.numpy()[clusterlabel[:50] == i], keepdims=True)[0][0] for i in range(num_classes)}
+                    predicted_labels = np.array([label_map[cluster.item()] for cluster in new_labels_clusters])
+                    if predicted_labels.shape == labels.numpy().shape:
+                        accuracy = (predicted_labels == labels.numpy()).astype(float).mean()
+                    else:
+                        print("Shape mismatch:", predicted_labels.shape, labels.numpy().shape)
+                        accuracy = 0  # 或者处理形状不匹配的情况
+                    accuracies.append(accuracy)
+                else:
+                    print("First Severe")
+                    # Ensemble predictions from both models
+                    pred_inc = predict_incremental(incremental_model, features)
+                    pred_batch = predict_batch_model(batch_model, features)
+                    weights_inc = gaussian_kernel(shift_distance)
+                    weights_batch = gaussian_kernel(shift_distance)
+                    ensemble_pred = (weights_inc * pred_inc + weights_batch * pred_batch) / (weights_inc + weights_batch)
+                    accuracy = (ensemble_pred == labels).float().mean()
+                    accuracies.append(accuracy)
+                    #if accuracies:
+                    #    print("Accuracies collected so far:", accuracies)  # 打印目前收集的准确率列表
+                    #print("First severe handled.")
+
+            elif shift_type == "Slight shift":
+                print("Slight")
                 # Ensemble predictions from both models
                 pred_inc = predict_incremental(incremental_model, features)
                 pred_batch = predict_batch_model(batch_model, features)
@@ -84,19 +132,25 @@ def main():
                 ensemble_pred = (weights_inc * pred_inc + weights_batch * pred_batch) / (weights_inc + weights_batch)
                 accuracy = (ensemble_pred == labels).float().mean()
                 accuracies.append(accuracy)
-                print("Slight Shift handled.")
+                #if accuracies:
+                 #   print("Accuracies collected so far:", accuracies)  # 打印目前收集的准确率列表
+                #print("Slight Shift handled.")
 
         # Always train the incremental model
-        train_incremental(incremental_model, features, labels)
-
+        train_incremental(incremental_model, features, labels, optimizer_incremental, criterion)
+        last_batch_data = features
+        if labels.size(0) >= 50:
+            last_labeled_data = features[-50:]
+            last_labels = labels[-50:]
         # Update the batch model conditionally
         if adaptive_window.should_update():
-            train_batch_model(batch_model, features, labels)
+            train_batch_model(batch_model, adaptive_window, optimizer_batch, criterion)
             model_history.add_model(batch_model.state_dict(), features.numpy())
 
-        last_batch_data = features
 
     # Save accuracies to a file
+    if accuracies:
+        print("Accuracies collected so far:", accuracies)  # 打印目前收集的准确率列表
     np.savetxt("accuracies.txt", np.array(accuracies))
 
 if __name__ == "__main__":

@@ -1,40 +1,45 @@
 import numpy as np
 
 class AdaptiveWindow:
-    def __init__(self, window_size, max_batches):
+    def __init__(self, window_size, max_batches, threshold=0.5):
         self.window_size = window_size
         self.max_batches = max_batches
         self.batches = []
         self.distances = []
+        self.threshold = threshold
 
     def add_batch(self, new_batch):
         if len(self.batches) >= self.max_batches:
-            self.batches.pop(0)  # Remove the oldest batch if the window is full
+            self.batches.pop(0)
         self.batches.append(new_batch)
         self.update_distances(new_batch)
 
+    def calculate_distance(self, batch1, batch2):
+        # 取两个批次中较小的行数
+        min_rows = min(batch1.shape[0], batch2.shape[0])
+        # 只计算公共行的距离
+        return np.linalg.norm(batch1[:min_rows] - batch2[:min_rows])
+
     def update_distances(self, new_batch):
-        # Calculate and store distances between the new batch and existing batches
         current_distances = [self.calculate_distance(new_batch, batch) for batch in self.batches[:-1]]
         self.distances.append(current_distances)
-        self.apply_decay()
-
-    def calculate_distance(self, batch1, batch2):
-        # Placeholder for actual distance calculation, e.g., Euclidean
-        return np.linalg.norm(batch1 - batch2)
+        if current_distances:
+            self.apply_decay()
 
     def apply_decay(self):
-        # Apply decay based on distances and their rank
-        sorted_indices = np.argsort([np.mean(dist) for dist in self.distances])
-        decay_rates = self.rank_to_decay_rates(sorted_indices)
-        for i, rate in enumerate(decay_rates):
-            self.batches[i] *= rate  # Apply decay rate to each batch
+        if self.distances and any(self.distances):
+            sorted_indices = np.argsort([np.mean(dist) if np.any(dist) else 0 for dist in self.distances])
+            decay_rates = self.rank_to_decay_rates(sorted_indices)
+            for i, rate in enumerate(decay_rates):
+                if i < len(self.batches):  # 确保索引在范围内
+                    self.batches[i] *= rate
 
     def rank_to_decay_rates(self, sorted_indices):
-        # Convert rank to decay rates
-        return [1.0 - (i / len(sorted_indices)) * 0.1 for i in sorted_indices]  # Example decay rate calculation
+        return [1.0 - (i / len(sorted_indices)) * 0.1 for i in sorted_indices]
 
     def should_update(self):
-        # Determine if an update is necessary based on the disorder in distance rankings
-        disorder = np.std([np.mean(dist) for dist in self.distances])
-        return disorder > some_threshold  # Placeholder threshold
+        if self.distances and any(self.distances):
+            disorder = np.std([np.mean(dist) if np.any(dist) else 0 for dist in self.distances])
+            return disorder > self.threshold
+        return False
+
